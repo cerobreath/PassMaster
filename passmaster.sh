@@ -248,37 +248,13 @@ edit_password() {
 
     valid_input=true
 
-    while true; do
-        new_service=$(whiptail --inputbox "Enter new service name (or leave blank to keep \"$selected_service\"):" 10 60 3>&1 1>&2 2>&3 || echo "")
-        handle_cancel "$new_service" || { valid_input=false; break; }
-        new_service=$(echo "$new_service" | xargs)
-        if [[ -z "$new_service" ]]; then
-            new_service=$selected_service
-            break
-        elif [[ ! "$new_service" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-            whiptail --msgbox "Service name can only contain letters, numbers, dots, dashes, and underscores. Please try again." 10 60
-        else
-            break
-        fi
-    done
+    new_service=$(whiptail --inputbox "Enter new service name (or press OK to keep \"$selected_service\"):" 10 60 "$selected_service" 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$new_service" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
+    new_service=$(echo "$new_service" | xargs)
 
-    if ! $valid_input; then rm -f "$SAFE_DIR/index.tmp"; return; fi
-
-    while true; do
-        new_username=$(whiptail --inputbox "Enter new username (or leave blank to keep \"$username\"):" 10 60 3>&1 1>&2 2>&3 || echo "")
-        handle_cancel "$new_username" || { valid_input=false; break; }
-        new_username=$(echo "$new_username" | xargs)
-        if [[ -z "$new_username" ]]; then
-            new_username=$username
-            break
-        elif [[ ! "$new_username" =~ ^[a-zA-Z0-9._@+-]+$ ]]; then
-            whiptail --msgbox "Username can only contain letters, numbers, dots, underscores, @, dashes, and plus signs. Please try again." 10 60
-        else
-            break
-        fi
-    done
-
-    if ! $valid_input; then rm -f "$SAFE_DIR/index.tmp"; return; fi
+    new_username=$(whiptail --inputbox "Enter new username (or press OK to keep \"$username\"):" 10 60 "$username" 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$new_username" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
+    new_username=$(echo "$new_username" | xargs)
 
     while true; do
         new_password=$(whiptail --passwordbox "Enter new password:" 10 60 3>&1 1>&2 2>&3)
