@@ -5,11 +5,11 @@ A lightweight and secure password manager built in Bash, featuring AES-256 encry
 ## Features
 
 - **Cross-Platform Support**: Works out of the box on various Linux distributions with dependency checks.
-- **AES-256 Encryption**: Ensures all stored passwords are securely encrypted.
-- **User-Friendly Interface**: Easy-to-navigate dialog-based menus.
-- **Password Management**: Add, retrieve, view, and delete service credentials.
-- **Password Generator**: Create secure, randomly generated passwords of custom lengths.
-- **No External Dependencies**: Uses built-in tools (OpenSSL and Whiptail) available on most Linux systems.
+- **Secure Storage:** Passwords are encrypted with AES-256.
+- **User Authentication:** A passphrase is required to access the stored passwords.
+- **Service-Based Organization:** Passwords are categorized by service name and username.
+- **Password Management Options:** Add, retrieve, edit, and delete stored passwords.
+- **Password Generation:** Generate unique passwords directly from the program.
 
 ## Screenshots
 
@@ -52,25 +52,25 @@ If the required tools are not installed, PassMaster will attempt to install them
 ## How It Works
 
 1. **Initialization**:
-    - The script creates a secure directory (`safe`) to store encrypted files.
-    - A master passphrase is set during the first run, used for encrypting and decrypting data.
+   - The program initializes by loading necessary modules and configuration files.
+   - It establishes a secure environment for handling user credentials and sensitive data.
 
 2. **Password Storage**:
-    - Each service credential is encrypted with AES-256 and stored as a separate file.
-    - An encrypted index file maintains mappings of service names, usernames, and file references.
+   - User credentials for different services are securely encrypted and stored in a structured database.
+   - Each entry includes service name, username, and password, all protected by advanced cryptographic methods.
 
 3. **Data Retrieval**:
-    - Decrypts the index file to present a list of saved services.
-    - The user selects a service to retrieve the credentials, which are decrypted on-the-fly.
+   - Users can search for stored credentials using a service name or other identifiers.
+   - The program retrieves and decrypts the requested credentials for display or use.
 
 4. **Password Generation**:
-    - Securely generates random passwords using OpenSSL.
+   - The system generates strong, random passwords using a robust algorithm, ensuring high security.
 
 ## Security
 
-- **AES-256 Encryption**: Industry-standard encryption ensures your passwords remain protected.
-- **Secure Storage**: All files are stored with restricted permissions.
-- **No External Servers**: All data remains local to your system.
+- **Strong Encryption**: Employs state-of-the-art cryptographic techniques to safeguard your data.
+- **Secure Database**: All sensitive information is stored in an encrypted database with restricted access.
+- **Local Processing**: No data is transmitted to external servers, ensuring complete user privacy.
 
 ## Contributing
 
@@ -78,4 +78,4 @@ Contributions are welcome! If you find a bug or have a feature request, feel fre
 
 ## Disclaimer
 
-PassMaster is provided as-is, without any guarantees. Use it responsibly and always back up your data.
+The software is provided as-is, without any guarantees. Use it responsibly and always back up your data.
