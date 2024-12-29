@@ -80,8 +80,24 @@ add_password() {
 
 # Function to retrieve a password
 retrieve_password() {
-    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp"
+    if [[ ! -s "$INDEX_FILE" ]]; then
+        whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
+        return
+    fi
+
+    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp" 2>/dev/null
+    if [[ $? -ne 0 ]]; then
+        whiptail --msgbox "Failed to decrypt index file. Check your passphrase!" 10 60
+        return
+    fi
+
     services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
+    if [[ -z "$services" ]]; then
+        whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
+        rm -f "$SAFE_DIR/index.tmp"
+        return
+    fi
+
     service=$(whiptail --menu "Choose a service:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3)
     selected_service=$(echo "$services" | sed -n "${service}p")
 
@@ -93,9 +109,13 @@ retrieve_password() {
     username_file=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1 | cut -d: -f2,3 --output-delimiter=' ')
     username=$(echo "$username_file" | awk '{print $1}')
     file_name=$(echo "$username_file" | awk '{print $2}')
-    password=$(openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/$file_name")
+    password=$(openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/$file_name" 2>/dev/null)
 
-    whiptail --msgbox "Service: $selected_service\nUsername: $username\nPassword: $password" 15 60
+    if [[ $? -ne 0 ]]; then
+        whiptail --msgbox "Failed to decrypt the password for $selected_service. Check your passphrase!" 10 60
+    else
+        whiptail --msgbox "Service:  $selected_service\nUsername: $username\nPassword: $password" 15 60
+    fi
     rm -f "$SAFE_DIR/index.tmp"
 }
 
@@ -119,6 +139,11 @@ view_services() {
 
 # Function to delete a password
 delete_password() {
+    if [[ ! -s "$INDEX_FILE" ]]; then
+        whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
+        return
+    fi
+
     openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp" 2>/dev/null
     if [[ $? -ne 0 ]]; then
         whiptail --msgbox "Failed to decrypt index file. Check your passphrase!" 10 60
@@ -126,6 +151,12 @@ delete_password() {
     fi
 
     services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
+    if [[ -z "$services" ]]; then
+        whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
+        rm -f "$SAFE_DIR/index.tmp"
+        return
+    fi
+
     service=$(whiptail --menu "Choose a service to delete:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3)
     selected_service=$(echo "$services" | sed -n "${service}p")
 
