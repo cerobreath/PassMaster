@@ -61,10 +61,11 @@ handle_cancel() {
 
 # Function to add a password
 add_password() {
+    valid_input=true
+
     while true; do
         service=$(whiptail --inputbox "Enter the service name (e.g., Gmail):" 10 60 3>&1 1>&2 2>&3 || echo "")
-        handle_cancel "$service" || return
-        # Trim whitespace and validate
+        handle_cancel "$service" || { valid_input=false; break; }
         service=$(echo "$service" | xargs)
         if [[ -z "$service" ]]; then
             whiptail --msgbox "Service name cannot be empty or only spaces. Please try again." 10 60
@@ -75,10 +76,11 @@ add_password() {
         fi
     done
 
+    if ! $valid_input; then return; fi
+
     while true; do
         username=$(whiptail --inputbox "Enter the username:" 10 60 3>&1 1>&2 2>&3 || echo "")
-        handle_cancel "$username" || return
-        # Trim whitespace and validate
+        handle_cancel "$username" || { valid_input=false; break; }
         username=$(echo "$username" | xargs)
         if [[ -z "$username" ]]; then
             whiptail --msgbox "Username cannot be empty or only spaces. Please try again." 10 60
@@ -89,10 +91,11 @@ add_password() {
         fi
     done
 
+    if ! $valid_input; then return; fi
+
     while true; do
         password=$(whiptail --passwordbox "Enter the password:" 10 60 3>&1 1>&2 2>&3 || echo "")
-        handle_cancel "$password" || return
-        # Trim whitespace and validate
+        handle_cancel "$password" || { valid_input=false; break; }
         password=$(echo "$password" | xargs)
         if [[ -z "$password" ]]; then
             whiptail --msgbox "Password cannot be empty or only spaces. Please try again." 10 60
@@ -100,6 +103,8 @@ add_password() {
             break
         fi
     done
+
+    if ! $valid_input; then return; fi
 
     file_name=$(openssl rand -hex 12)
     echo "$password" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -out "$SAFE_DIR/$file_name"
