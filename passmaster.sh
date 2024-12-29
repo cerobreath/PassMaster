@@ -137,6 +137,12 @@ retrieve_password() {
     fi
 
     service=$(whiptail --menu "Choose a service:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3)
+    if [[ $? -ne 0 ]]; then
+        # Cancel button pressed, clean up and return to the main menu
+        rm -f "$SAFE_DIR/index.tmp"
+        return
+    fi
+
     selected_service=$(echo "$services" | sed -n "${service}p")
 
     if [[ -z $selected_service ]]; then
@@ -195,9 +201,10 @@ delete_password() {
         return
     fi
 
-    service=$(whiptail --menu "Choose a service to delete:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3)
-    selected_service=$(echo "$services" | sed -n "${service}p")
+    service=$(whiptail --menu "Choose a service to delete:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$service" || { rm -f "$SAFE_DIR/index.tmp"; return; }
 
+    selected_service=$(echo "$services" | sed -n "${service}p")
     if [[ -z $selected_service ]]; then
         rm -f "$SAFE_DIR/index.tmp"
         return
@@ -207,15 +214,18 @@ delete_password() {
     username=$(echo "$entry" | cut -d: -f2)
     file_name=$(echo "$entry" | cut -d: -f3)
 
-    # Remove entry from index
+    whiptail --yesno "Are you sure you want to delete the password for the service:\n\nService: $selected_service\nUsername: $username?" 15 60
+    if [[ $? -ne 0 ]]; then
+        rm -f "$SAFE_DIR/index.tmp"
+        return
+    fi
+
     grep -v "^$selected_service:" "$SAFE_DIR/index.tmp" > "$SAFE_DIR/index.updated.tmp"
     mv "$SAFE_DIR/index.updated.tmp" "$SAFE_DIR/index.tmp"
 
-    # Re-encrypt the index
     openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
     rm -f "$SAFE_DIR/index.tmp"
 
-    # Remove the password file
     if [[ -f "$SAFE_DIR/$file_name" ]]; then
         rm -f "$SAFE_DIR/$file_name"
         whiptail --msgbox "Password for $selected_service deleted successfully!" 10 60
