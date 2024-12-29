@@ -152,34 +152,37 @@ retrieve_password() {
         return
     fi
 
-    services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
-    if [[ -z "$services" ]]; then
+    services_and_users=$(cut -d: -f1,2 "$SAFE_DIR/index.tmp" | sort | uniq)
+    if [[ -z "$services_and_users" ]]; then
         whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
     menu_items=()
-    while IFS= read -r service; do
-        menu_items+=("$service" "$service")
-    done <<< "$services"
+    while IFS= read -r line; do
+        service=$(echo "$line" | cut -d: -f1)
+        username=$(echo "$line" | cut -d: -f2)
+        display_name="$service ($username)"
+        menu_items+=("$display_name" "")  # Додаємо лише опис для вибору
+    done <<< "$services_and_users"
 
-    service=$(whiptail --menu "Choose a service:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
+    choice=$(whiptail --menu "Choose a service:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
     if [[ $? -ne 0 ]]; then
-        # Cancel button pressed, clean up and return to the main menu
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
-    username_file=$(grep "^$service:" "$SAFE_DIR/index.tmp" | head -n 1 | cut -d: -f2,3 --output-delimiter=' ')
+    selected_service=$(echo "$choice" | sed -E 's/\s+\(.*\)$//')
+    username_file=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1 | cut -d: -f2,3 --output-delimiter=' ')
     username=$(echo "$username_file" | awk '{print $1}')
     file_name=$(echo "$username_file" | awk '{print $2}')
     password=$(openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/$file_name" 2>/dev/null)
 
     if [[ $? -ne 0 ]]; then
-        whiptail --msgbox "Failed to decrypt the password for $service. Check your passphrase!" 10 60
+        whiptail --msgbox "Failed to decrypt the password for $selected_service. Check your passphrase!" 10 60
     else
-        whiptail --msgbox "Service:  $service\nUsername: $username\nPassword: $password" 15 60
+        whiptail --msgbox "Service:  $selected_service\nUsername: $username\nPassword: $password" 15 60
     fi
     rm -f "$SAFE_DIR/index.tmp"
 }
@@ -197,25 +200,28 @@ edit_password() {
         return
     fi
 
-    services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
-    if [[ -z "$services" ]]; then
+    services_and_users=$(cut -d: -f1,2 "$SAFE_DIR/index.tmp" | sort | uniq)
+    if [[ -z "$services_and_users" ]]; then
         whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
     menu_items=()
-    while IFS= read -r service; do
-        menu_items+=("$service" "$service")
-    done <<< "$services"
+    while IFS= read -r line; do
+        service=$(echo "$line" | cut -d: -f1)
+        username=$(echo "$line" | cut -d: -f2)
+        display_name="$service ($username)"
+        menu_items+=("$display_name" "")
+    done <<< "$services_and_users"
 
-    service=$(whiptail --menu "Choose a service to edit:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
+    choice=$(whiptail --menu "Choose a service to edit:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
     if [[ $? -ne 0 ]]; then
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
-    selected_service="$service"
+    selected_service=$(echo "$choice" | sed -E 's/\s+\(.*\)$//')
 
     entry=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1)
     username=$(echo "$entry" | cut -d: -f2)
@@ -318,36 +324,40 @@ delete_password() {
         return
     fi
 
-    services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
-    if [[ -z "$services" ]]; then
+    services_and_users=$(cut -d: -f1,2 "$SAFE_DIR/index.tmp" | sort | uniq)
+    if [[ -z "$services_and_users" ]]; then
         whiptail --msgbox "No passwords have been saved yet. Please save a password first!" 10 60
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
     menu_items=()
-    while IFS= read -r service; do
-        menu_items+=("$service" "$service")
-    done <<< "$services"
+    while IFS= read -r line; do
+        service=$(echo "$line" | cut -d: -f1)
+        username=$(echo "$line" | cut -d: -f2)
+        display_name="$service ($username)"
+        menu_items+=("$display_name" "")
+    done <<< "$services_and_users"
 
-    service=$(whiptail --menu "Choose a service to delete:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
+    choice=$(whiptail --menu "Choose a service to delete:" 20 60 10 "${menu_items[@]}" 3>&1 1>&2 2>&3)
     if [[ $? -ne 0 ]]; then
-        # Cancel button pressed, clean up and return to the main menu
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
-    entry=$(grep "^$service:" "$SAFE_DIR/index.tmp" | head -n 1)
+    selected_service=$(echo "$choice" | sed -E 's/\s+\(.*\)$//')
+
+    entry=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1)
     username=$(echo "$entry" | cut -d: -f2)
     file_name=$(echo "$entry" | cut -d: -f3)
 
-    whiptail --yesno "Are you sure you want to delete the password for the service:\n\nService: $service\nUsername: $username" 15 60
+    whiptail --yesno "Are you sure you want to delete the password for the service:\n\nService: $selected_service\nUsername: $username" 15 60
     if [[ $? -ne 0 ]]; then
         rm -f "$SAFE_DIR/index.tmp"
         return
     fi
 
-    grep -v "^$service:" "$SAFE_DIR/index.tmp" > "$SAFE_DIR/index.updated.tmp"
+    grep -v "^$selected_service:" "$SAFE_DIR/index.tmp" > "$SAFE_DIR/index.updated.tmp"
     mv "$SAFE_DIR/index.updated.tmp" "$SAFE_DIR/index.tmp"
 
     openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
@@ -355,9 +365,9 @@ delete_password() {
 
     if [[ -f "$SAFE_DIR/$file_name" ]]; then
         rm -f "$SAFE_DIR/$file_name"
-        whiptail --msgbox "Password for $service deleted successfully!" 10 60
+        whiptail --msgbox "Password for $selected_service deleted successfully!" 10 60
     else
-        whiptail --msgbox "Failed to find the password file for $service!" 10 60
+        whiptail --msgbox "Failed to find the password file for $selected_service!" 10 60
     fi
 }
 
