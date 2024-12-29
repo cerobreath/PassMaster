@@ -45,12 +45,13 @@ initialize() {
 
 # Function to display the main menu
 menu() {
-    whiptail --title "Password Manager" --menu "Choose an option:" 20 60 5 \
+    whiptail --title "Password Manager" --menu "Choose an option:" 20 60 6 \
         "1" "Add a new password" \
         "2" "Retrieve a password" \
         "3" "View all saved services" \
         "4" "Delete a password" \
-        "5" "Exit" 3>&1 1>&2 2>&3 || echo "exit"
+        "5" "Generate a unique password" \
+        "6" "Exit" 3>&1 1>&2 2>&3 || echo "exit"
 }
 
 # Function to handle cancellations
@@ -154,6 +155,22 @@ delete_password() {
     fi
 }
 
+# Function to generate a unique password
+generate_password() {
+    length=$(whiptail --inputbox "Enter the desired password length (minimum 8):" 10 60 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$length" || return
+
+    if ! [[ "$length" =~ ^[0-9]+$ ]] || [[ "$length" -lt 8 ]]; then
+        whiptail --msgbox "Invalid length. Please enter a number greater than or equal to 8." 10 60
+        return
+    fi
+
+    # Generate a cryptographically secure password
+    password=$(openssl rand -base64 $((length * 3 / 4)) | tr -d '\n' | head -c "$length")
+
+    whiptail --msgbox "Generated Password:\n$password" 10 60
+}
+
 # Main script
 check_dependencies
 initialize
@@ -166,7 +183,8 @@ while true; do
         2) retrieve_password ;;
         3) view_services ;;
         4) delete_password ;;
-        5) exit ;;
+        5) generate_password ;;
+        6) exit ;;
         *) whiptail --msgbox "Invalid option!" 10 60 ;;
     esac
 done
