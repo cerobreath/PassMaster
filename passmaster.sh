@@ -1,9 +1,51 @@
 #!/bin/bash
 
-SAFE_DIR="./safe"
-INDEX_FILE="./safe/index.enc"
-PASS_PHRASE_FILE="./safe/passphrase"
-PASS_PHRASE=""
+SAFE_DIR="$HOME/.local/share/passmaster"
+INDEX_FILE="$SAFE_DIR/index.enc"
+PASS_PHRASE_FILE="$SAFE_DIR/passphrase.enc"
+
+# Function to initialize safe directory and passphrase
+initialize() {
+    # Secure the directory
+    mkdir -p "$SAFE_DIR"
+    chmod 700 "$SAFE_DIR"
+
+    if [[ ! -f "$PASS_PHRASE_FILE" ]]; then
+        local user_passphrase=$(whiptail --passwordbox "Set a secure passphrase for the password manager:" 10 60 3>&1 1>&2 2>&3)
+        if [[ -z "$user_passphrase" ]]; then
+            whiptail --msgbox "Passphrase cannot be empty. Initialization failed!" 10 60
+            exit 1
+        fi
+
+        local master_key
+        master_key=$(openssl rand -hex 32)
+        echo "$master_key" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$user_passphrase" -out "$PASS_PHRASE_FILE"
+        chmod 600 "$PASS_PHRASE_FILE"
+    fi
+
+    if [[ ! -f "$INDEX_FILE" ]]; then
+        touch "$SAFE_DIR/index.tmp"
+        local master_key
+        master_key=$(decrypt_passphrase)
+        openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$master_key" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
+        rm -f "$SAFE_DIR/index.tmp"
+    fi
+}
+
+# Function to decrypt passphrase
+decrypt_passphrase() {
+    local user_passphrase
+    user_passphrase=$(whiptail --passwordbox "Enter your secure passphrase to unlock the manager:" 10 60 3>&1 1>&2 2>&3)
+    if [[ -z "$user_passphrase" ]]; then
+        whiptail --msgbox "Passphrase cannot be empty. Access denied!" 10 60
+        exit 1
+    fi
+
+    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$user_passphrase" -in "$PASS_PHRASE_FILE" 2>/dev/null || {
+        whiptail --msgbox "Failed to decrypt passphrase. Access denied!" 10 60
+        exit 1
+    }
+}
 
 # Function to check and install required packages
 check_dependencies() {
@@ -22,25 +64,6 @@ check_dependencies() {
             fi
         fi
     done
-}
-
-# Function to initialize safe directory and passphrase
-initialize() {
-    mkdir -p "$SAFE_DIR"
-
-    if [[ ! -f "$PASS_PHRASE_FILE" ]]; then
-        PASS_PHRASE=$(whiptail --passwordbox "Set a secure passphrase for the password manager:" 10 60 3>&1 1>&2 2>&3)
-        echo "$PASS_PHRASE" > "$PASS_PHRASE_FILE"
-        chmod 600 "$PASS_PHRASE_FILE"
-    else
-        PASS_PHRASE=$(cat "$PASS_PHRASE_FILE")
-    fi
-
-    if [[ ! -f "$INDEX_FILE" ]]; then
-        touch "$SAFE_DIR/index.tmp"
-        openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
-        rm -f "$SAFE_DIR/index.tmp"
-    fi
 }
 
 # Function to display the main menu
