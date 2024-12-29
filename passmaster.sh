@@ -326,13 +326,16 @@ delete_password() {
 
 # Function to generate a unique password
 generate_password() {
-    length=$(whiptail --inputbox "Enter the desired password length (minimum 8):" 10 60 3>&1 1>&2 2>&3 || echo "")
-    handle_cancel "$length" || return
+    while true; do
+            length=$(whiptail --inputbox "Enter the desired password length (minimum 8, maximum 50):" 10 60 3>&1 1>&2 2>&3 || echo "")
+            handle_cancel "$length" || return
 
-    if ! [[ "$length" =~ ^[0-9]+$ ]] || [[ "$length" -lt 8 ]]; then
-        whiptail --msgbox "Invalid length. Please enter a number greater than or equal to 8." 10 60
-        return
-    fi
+            if [[ "$length" =~ ^[0-9]+$ ]] && [[ "$length" -ge 8 ]] && [[ "$length" -le 50 ]]; then
+                break
+            else
+                whiptail --msgbox "Invalid length. Please enter a number between 8 and 50." 10 60
+            fi
+    done
 
     # Generate a cryptographically secure password
     password=$(openssl rand -base64 $((length * 3 / 4)) | tr -d '\n' | head -c "$length")
