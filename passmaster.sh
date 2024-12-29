@@ -50,19 +50,22 @@ menu() {
         "2" "Retrieve a password" \
         "3" "View all saved services" \
         "4" "Delete a password" \
-        "5" "Exit" 3>&1 1>&2 2>&3
+        "5" "Exit" 3>&1 1>&2 2>&3 || echo "exit"
+}
+
+# Function to handle cancellations
+handle_cancel() {
+    [[ -z $1 ]] && return 1 || return 0
 }
 
 # Function to add a password
 add_password() {
-    service=$(whiptail --inputbox "Enter the service name (e.g., Gmail):" 10 60 3>&1 1>&2 2>&3)
-    username=$(whiptail --inputbox "Enter the username:" 10 60 3>&1 1>&2 2>&3)
-    password=$(whiptail --passwordbox "Enter the password:" 10 60 3>&1 1>&2 2>&3)
-
-    if [[ -z $service || -z $username || -z $password ]]; then
-        whiptail --msgbox "All fields are required!" 10 60
-        return
-    fi
+    service=$(whiptail --inputbox "Enter the service name (e.g., Gmail):" 10 60 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$service" || return
+    username=$(whiptail --inputbox "Enter the username:" 10 60 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$username" || return
+    password=$(whiptail --passwordbox "Enter the password:" 10 60 3>&1 1>&2 2>&3 || echo "")
+    handle_cancel "$password" || return
 
     file_name=$(openssl rand -hex 12)
     echo "$password" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -out "$SAFE_DIR/$file_name"
@@ -157,6 +160,7 @@ initialize
 
 while true; do
     choice=$(menu)
+    [[ $choice == "exit" ]] && break
     case $choice in
         1) add_password ;;
         2) retrieve_password ;;
