@@ -1,17 +1,41 @@
 #!/bin/bash
 
-# Enhanced Password Manager in Bash
-# Requires: openssl, whiptail
-
 SAFE_DIR="./safe"
 INDEX_FILE="./safe/index.enc"
-PASS_PHRASE="YourSuperSecurePassphrase"  # Change this to your secure passphrase
+PASS_PHRASE_FILE="./safe/passphrase"
+PASS_PHRASE=""
 
-# Ensure the safe directory exists
-mkdir -p "$SAFE_DIR"
+# Function to check and install required packages
+check_dependencies() {
+    for pkg in openssl whiptail; do
+        if ! command -v "$pkg" &>/dev/null; then
+            echo "Installing $pkg..."
+            if command -v apt &>/dev/null; then
+                sudo apt update && sudo apt install -y "$pkg"
+            elif command -v dnf &>/dev/null; then
+                sudo dnf install -y "$pkg"
+            elif command -v pacman &>/dev/null; then
+                sudo pacman -Syu --noconfirm "$pkg"
+            else
+                echo "Error: Package manager not supported. Install $pkg manually." >&2
+                exit 1
+            fi
+        fi
+    done
+}
 
-# Function to initialize safe directory and index
+# Function to initialize safe directory and passphrase
 initialize() {
+    mkdir -p "$SAFE_DIR"
+
+    if [[ ! -f "$PASS_PHRASE_FILE" ]]; then
+        PASS_PHRASE=$(whiptail --passwordbox "Set a secure passphrase for the password manager:" 10 60 3>&1 1>&2 2>&3)
+        echo "$PASS_PHRASE" > "$PASS_PHRASE_FILE"
+        chmod 600 "$PASS_PHRASE_FILE"
+    else
+        PASS_PHRASE=$(cat "$PASS_PHRASE_FILE")
+    fi
+
     if [[ ! -f "$INDEX_FILE" ]]; then
         touch "$SAFE_DIR/index.tmp"
         openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
@@ -73,15 +97,30 @@ retrieve_password() {
 
 # Function to view all saved services
 view_services() {
-    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp"
+    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp" 2>/dev/null
+    if [[ $? -ne 0 ]]; then
+        whiptail --msgbox "Failed to decrypt index file. Check your passphrase!" 10 60
+        return
+    fi
+
     services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
-    whiptail --msgbox "Saved services:\n\n$services" 20 60
+    if [[ -z $services ]]; then
+        whiptail --msgbox "No services found!" 10 60
+    else
+        whiptail --msgbox "Saved services:\n\n$services" 20 60
+    fi
+
     rm -f "$SAFE_DIR/index.tmp"
 }
 
 # Function to delete a password
 delete_password() {
-    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp"
+    openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp" 2>/dev/null
+    if [[ $? -ne 0 ]]; then
+        whiptail --msgbox "Failed to decrypt index file. Check your passphrase!" 10 60
+        return
+    fi
+
     services=$(cut -d: -f1 "$SAFE_DIR/index.tmp" | sort | uniq)
     service=$(whiptail --menu "Choose a service to delete:" 20 60 10 $(echo "$services" | nl -w2 -s' ') 3>&1 1>&2 2>&3)
     selected_service=$(echo "$services" | sed -n "${service}p")
@@ -91,19 +130,31 @@ delete_password() {
         return
     fi
 
-    username_file=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1 | cut -d: -f2,3 --output-delimiter=' ')
-    file_name=$(echo "$username_file" | awk '{print $2}')
+    entry=$(grep "^$selected_service:" "$SAFE_DIR/index.tmp" | head -n 1)
+    username=$(echo "$entry" | cut -d: -f2)
+    file_name=$(echo "$entry" | cut -d: -f3)
 
-    sed -i "/^$selected_service:/d" "$SAFE_DIR/index.tmp"
-    rm -f "$SAFE_DIR/$file_name"
+    # Remove entry from index
+    grep -v "^$selected_service:" "$SAFE_DIR/index.tmp" > "$SAFE_DIR/index.updated.tmp"
+    mv "$SAFE_DIR/index.updated.tmp" "$SAFE_DIR/index.tmp"
+
+    # Re-encrypt the index
     openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$SAFE_DIR/index.tmp" -out "$INDEX_FILE"
     rm -f "$SAFE_DIR/index.tmp"
 
-    whiptail --msgbox "Password for $selected_service deleted successfully!" 10 60
+    # Remove the password file
+    if [[ -f "$SAFE_DIR/$file_name" ]]; then
+        rm -f "$SAFE_DIR/$file_name"
+        whiptail --msgbox "Password for $selected_service deleted successfully!" 10 60
+    else
+        whiptail --msgbox "Failed to find the password file for $selected_service!" 10 60
+    fi
 }
 
-# Main loop
+# Main script
+check_dependencies
 initialize
+
 while true; do
     choice=$(menu)
     case $choice in
