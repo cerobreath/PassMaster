@@ -267,13 +267,35 @@ edit_password() {
 
     valid_input=true
 
-    new_service=$(whiptail --inputbox "Enter new service name (or press OK to keep \"$selected_service\"):" 10 60 "$selected_service" 3>&1 1>&2 2>&3 || echo "")
-    handle_cancel "$new_service" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
-    new_service=$(echo "$new_service" | xargs)
+    while true; do
+        new_service=$(whiptail --inputbox "Enter new service name (or press OK to keep \"$selected_service\"):" 10 60 "$selected_service" 3>&1 1>&2 2>&3 || echo "")
+        handle_cancel "$new_service" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
+        new_service=$(echo "$new_service" | xargs)
+        if [[ -z "$new_service" ]]; then
+            whiptail --msgbox "Service name cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#new_service} -gt 30 ]]; then
+            whiptail --msgbox "Service name cannot exceed 30 characters. Please try again." 10 60
+        elif [[ ! "$new_service" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            whiptail --msgbox "Service name can only contain letters, numbers, dots, dashes, and underscores. Please try again." 10 60
+        else
+            break
+        fi
+    done
 
-    new_username=$(whiptail --inputbox "Enter new username (or press OK to keep \"$username\"):" 10 60 "$username" 3>&1 1>&2 2>&3 || echo "")
-    handle_cancel "$new_username" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
-    new_username=$(echo "$new_username" | xargs)
+    while true; do
+        new_username=$(whiptail --inputbox "Enter new username (or press OK to keep \"$username\"):" 10 60 "$username" 3>&1 1>&2 2>&3 || echo "")
+        handle_cancel "$new_username" || { valid_input=false; rm -f "$SAFE_DIR/index.tmp"; return; }
+        new_username=$(echo "$new_username" | xargs)
+        if [[ -z "$new_username" ]]; then
+            whiptail --msgbox "Username cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#new_username} -gt 50 ]]; then
+            whiptail --msgbox "Username cannot exceed 50 characters. Please try again." 10 60
+        elif [[ ! "$new_username" =~ ^[a-zA-Z0-9._@+-]+$ ]]; then
+            whiptail --msgbox "Username can only contain letters, numbers, dots, underscores, @, dashes, and plus signs. Please try again." 10 60
+        else
+            break
+        fi
+    done
 
     while true; do
         new_password=$(whiptail --passwordbox "Enter new password:" 10 60 3>&1 1>&2 2>&3)
@@ -282,16 +304,24 @@ edit_password() {
             return
         fi
 
-        new_password_confirm=$(whiptail --passwordbox "Confirm new password:" 10 60 3>&1 1>&2 2>&3)
-        if [[ $? -ne 0 ]]; then
-            rm -f "$SAFE_DIR/index.tmp"
-            return
-        fi
-
-        if [[ "$new_password" != "$new_password_confirm" ]]; then
-            whiptail --msgbox "Passwords do not match. Please try again." 10 60
+        if [[ -z "$new_password" ]]; then
+            whiptail --msgbox "Password cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#new_password} -lt 8 ]]; then
+            whiptail --msgbox "Password must be at least 8 characters long. Please try again." 10 60
+        elif [[ ${#new_password} -gt 64 ]]; then
+            whiptail --msgbox "Password cannot exceed 64 characters. Please try again." 10 60
         else
-            break
+            new_password_confirm=$(whiptail --passwordbox "Confirm new password:" 10 60 3>&1 1>&2 2>&3)
+            if [[ $? -ne 0 ]]; then
+                rm -f "$SAFE_DIR/index.tmp"
+                return
+            fi
+
+            if [[ "$new_password" != "$new_password_confirm" ]]; then
+                whiptail --msgbox "Passwords do not match. Please try again." 10 60
+            else
+                break
+            fi
         fi
     done
 
