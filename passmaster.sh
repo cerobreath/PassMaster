@@ -86,12 +86,15 @@ handle_cancel() {
 add_password() {
     valid_input=true
 
+    # Validate service name
     while true; do
         service=$(whiptail --inputbox "Enter the service name (e.g., Gmail):" 10 60 3>&1 1>&2 2>&3 || echo "")
         handle_cancel "$service" || { valid_input=false; break; }
         service=$(echo "$service" | xargs)
         if [[ -z "$service" ]]; then
             whiptail --msgbox "Service name cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#service} -gt 30 ]]; then
+            whiptail --msgbox "Service name cannot exceed 30 characters. Please try again." 10 60
         elif [[ ! "$service" =~ ^[a-zA-Z0-9._-]+$ ]]; then
             whiptail --msgbox "Service name can only contain letters, numbers, dots, dashes, and underscores. Please try again." 10 60
         else
@@ -101,12 +104,15 @@ add_password() {
 
     if ! $valid_input; then return; fi
 
+    # Validate username
     while true; do
         username=$(whiptail --inputbox "Enter the username:" 10 60 3>&1 1>&2 2>&3 || echo "")
         handle_cancel "$username" || { valid_input=false; break; }
         username=$(echo "$username" | xargs)
         if [[ -z "$username" ]]; then
             whiptail --msgbox "Username cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#username} -gt 50 ]]; then
+            whiptail --msgbox "Username cannot exceed 50 characters. Please try again." 10 60
         elif [[ ! "$username" =~ ^[a-zA-Z0-9._@+-]+$ ]]; then
             whiptail --msgbox "Username can only contain letters, numbers, dots, underscores, @, dashes, and plus signs. Please try again." 10 60
         else
@@ -116,19 +122,32 @@ add_password() {
 
     if ! $valid_input; then return; fi
 
+    # Validate password and confirm it
     while true; do
         password=$(whiptail --passwordbox "Enter the password:" 10 60 3>&1 1>&2 2>&3 || echo "")
         handle_cancel "$password" || { valid_input=false; break; }
         password=$(echo "$password" | xargs)
         if [[ -z "$password" ]]; then
             whiptail --msgbox "Password cannot be empty or only spaces. Please try again." 10 60
+        elif [[ ${#password} -lt 8 ]]; then
+            whiptail --msgbox "Password must be at least 8 characters long. Please try again." 10 60
+        elif [[ ${#password} -gt 64 ]]; then
+            whiptail --msgbox "Password cannot exceed 64 characters. Please try again." 10 60
         else
-            break
+            confirm_password=$(whiptail --passwordbox "Re-enter the password to confirm:" 10 60 3>&1 1>&2 2>&3 || echo "")
+            handle_cancel "$confirm_password" || { valid_input=false; break; }
+            confirm_password=$(echo "$confirm_password" | xargs)
+            if [[ "$password" != "$confirm_password" ]]; then
+                whiptail --msgbox "Passwords do not match. Please try again." 10 60
+            else
+                break
+            fi
         fi
     done
 
     if ! $valid_input; then return; fi
 
+    # Encrypt and store password
     file_name=$(openssl rand -hex 12)
     echo "$password" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -out "$SAFE_DIR/$file_name"
     openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$PASS_PHRASE" -in "$INDEX_FILE" -out "$SAFE_DIR/index.tmp"
